@@ -109,6 +109,19 @@
      <string>Send File</string>
     </property>
    </widget>
+   <widget class="QPushButton" name="receiveFileButton">
+    <property name="geometry">
+     <rect>
+      <x>500</x>
+      <y>530</y>
+      <width>88</width>
+      <height>34</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Receive File</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
    <attribute name="toolBarArea">

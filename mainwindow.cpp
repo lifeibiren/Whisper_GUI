@@ -6,6 +6,7 @@
 MainWindow::MainWindow(const std::string &path, QWidget *parent) :
     QMainWindow(parent),
     ui_(new Ui::MainWindow),
+    fileBrowser_(new FileBrowser(this)),
     peerListModel_(new QStringListModel),
     timer_(new QTimer(this)),
     configPath_(path),
@@ -14,6 +15,7 @@ MainWindow::MainWindow(const std::string &path, QWidget *parent) :
 {
     ui_->setupUi(this);
     ui_->peerListView->setModel(peerListModel_.get());
+    ui_->receiveFileButton->setDisabled(true);
 
     connect(timer_.get(), SIGNAL(timeout()), this, SLOT(on_timeout()));
     timer_->start(1000);
@@ -23,6 +25,7 @@ MainWindow::MainWindow(const std::string &path, QWidget *parent) :
 
     peerList_ = std::make_unique<PeerList>(service_, this);
     connect(peerList_.get(), &PeerList::add_peer, this, &MainWindow::on_add_peer);
+    connect(fileBrowser_.get(), &FileBrowser::accepted, this, &MainWindow::on_fileBrowser_confirmed);
 //    connect(peerList_.get(), SIGNAL(add_peer(const sml::address &)), this, SLOT(on_add_peer(const sml::address &)));
 //    sml::address addr("127.0.0.1", config_["port"].as<uint16_t>() ^ 1);
 //    service_->post(make_shared<sml::add_peer>(addr));
@@ -40,10 +43,9 @@ MainWindow::MainWindow(const std::string &path, QWidget *parent) :
 //    list2<<"John: Nice to meet you!";
 //    model2->setStringList(list2);
 //    ui_->peerListView->setModel(model2);
-    int tail = peerListModel_->rowCount();
-    peerListModel_->insertRow(tail);
-    peerListModel_->setData(peerListModel_->index(tail), "123");
-
+//    int tail = peerListModel_->rowCount();
+//    peerListModel_->insertRow(tail);
+//    peerListModel_->setData(peerListModel_->index(tail), "123");
 }
 
 MainWindow::~MainWindow()
@@ -70,13 +72,20 @@ void MainWindow::on_timeout()
                 sml::new_peer *new_peer_msg = dynamic_cast<sml::new_peer *>(msg.get());
                 if (new_peer_msg)
                 {
+                    // append to peer list
                     int tail = peerListModel_->rowCount();
                     peerListModel_->insertRow(tail);
-                    peerListModel_->setData(peerListModel_->index(tail), QString::fromStdString(new_peer_msg->addr().to_string()));
+                    peerListModel_->setData(peerListModel_->index(tail), QString::fromStdString(new_peer_msg->id()));
                     std::cout<<new_peer_msg->addr().ip()<<":"<<new_peer_msg->addr().port()<<std::endl;
-                    ChatContext chatContext(config_["id"].as<QString>(),new_peer_msg->id(), new_peer_msg->addr());
-                    ui_->textListView->setModel(chatContext.model());
+                    // select tail
+                    ui_->peerListView->selectionModel()->select(peerListModel_->index(tail, 0), QItemSelectionModel::Select);
+
+                    // add new chatcontext
+                    std::unique_ptr<ChatContext> chatContext = std::make_unique<ChatContext>(service_, new_peer_msg->id(), new_peer_msg->addr());
+                    ui_->textListView->setModel(chatContext->model());
                     chat_.push_back(std::move(chatContext));
+                    // update current_chat_
+                    current_chat_ = chat_.rbegin()->get();
                 }
                 else
                 {
@@ -92,7 +101,14 @@ void MainWindow::on_timeout()
                 sml::recv_data *recv_data_msg = dynamic_cast<sml::recv_data *>(msg.get());
                 if (recv_data_msg)
                 {
-                    std::cout<<recv_data_msg->addr().ip()<<":"<<recv_data_msg->addr().port()<<":"<<recv_data_msg->data()<<std::endl;
+                    ChatContext *context = nullptr;
+                    for (int i = 0; i < (int)chat_.size(); i ++)
+                    {
+                        if (chat_[i]->addr() == recv_data_msg->addr())
+                        {
+                            context->feed(recv_data_msg);
+                        }
+                    }
                 }
                 else
                 {
@@ -112,8 +128,57 @@ void MainWindow::on_add_peer(const sml::address &addr)
 {
     std::cout<<addr.ip()<<' '<<(int)addr.port()<<std::endl;
     service_->post(boost::make_shared<sml::add_peer>(addr));
+    // control message
     service_->post(boost::make_shared<sml::add_stream>(addr, 0));
+    // chat message
+    service_->post(boost::make_shared<sml::add_stream>(addr, 1));
+    // file data
+    service_->post(boost::make_shared<sml::add_stream>(addr, 2));
 //    service_->post(boost::make_shared<sml::send_data>(addr, 0, "Hello World\n"));
+}
+
+void MainWindow::on_fileIncoming()
+{
+    if (current_chat_)
+    {
+
+    }
+}
+
+void MainWindow::on_fileBrowser_confirmed()
+{
+    if (!current_chat_)
+    {
+        return;
+    }
+    switch (state_)
+    {
+        case FileBrowserState::save:
+        {
+            current_chat_->startReceivingFile(fileBrowser_->getPath());
+            ui_->receiveFileButton->setDisabled(true);
+            break;
+        }
+        case FileBrowserState::send:
+        {
+            QFile file(fileBrowser_->getPath());
+            if (file.open(QIODevice::ReadOnly))
+            {
+                QByteArray bytes = file.readAll();
+                service_->post(boost::make_shared<sml::send_data>(current_chat_->addr(), 0, std::to_string(bytes.size())));
+                service_->post(boost::make_shared<sml::send_data>(current_chat_->addr(), 2, bytes.toStdString()));
+            }
+            else
+            {
+                std::cerr<<"open file failed:"<<fileBrowser_->getPath().toStdString()<<std::endl;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+
+
 }
 
 void MainWindow::on_settingsButton_clicked()
@@ -132,9 +197,6 @@ void MainWindow::on_sendButton_clicked()
 {
     if (current_chat_)
     {
-        service_->post(boost::make_shared<sml::send_data>(current_chat_->addr(),
-                                                          0,
-                                                          ui_->textEdit->toPlainText().toStdString()));
         current_chat_->appendMyMessage(ui_->textEdit->toPlainText());
     }
 }
@@ -148,11 +210,11 @@ void MainWindow::on_peerListView_clicked(const QModelIndex &index)
         int row = index.row();
         if (row < (int)chat_.size())
         {
-            current_chat_ = &chat_[row];
+            current_chat_ = chat_[row].get();
         }
         else if (chat_.size())
         {
-            current_chat_ = &chat_[0];
+            current_chat_ = chat_[0].get();
         }
         else
         {
@@ -167,4 +229,16 @@ void MainWindow::on_peerListView_clicked(const QModelIndex &index)
     {
         current_chat_ = nullptr;
     }
+}
+
+void MainWindow::on_sendFileButton_clicked()
+{
+    state_ = FileBrowserState::send;
+    fileBrowser_->show();
+}
+
+void MainWindow::on_receiveFileButton_clicked()
+{
+    state_ = FileBrowserState::save;
+    fileBrowser_->show();
 }

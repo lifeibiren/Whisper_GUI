@@ -29,7 +29,8 @@ SOURCES += \
     settingdialog.cpp \
     peerlist.cpp \
     trustedpeerstablemodel.cpp \
-    chatcontext.cpp
+    chatcontext.cpp \
+    filebrowser.cpp \
 
 HEADERS += \
         mainwindow.h \
@@ -37,12 +38,14 @@ HEADERS += \
     peerlist.h \
     trustedpeerstablemodel.h \
     yamlcpp-qt.h \
-    chatcontext.h
+    chatcontext.h \
+    filebrowser.h \
 
 FORMS += \
         mainwindow.ui \
     settingdialog.ui \
-    peerlist.ui
+    peerlist.ui \
+    filebrowser.ui
 
 #QMAKE_CXXFLAGS_DEBUG += -fsanitize=address,leak,undefined -g3
 #QMAKE_CFLAGS_DEBUG += -fsanitize=address,leak,undefined -g3
