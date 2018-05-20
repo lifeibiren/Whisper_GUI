@@ -34,16 +34,19 @@ public:
     void appendMyMessage(const QString &msg);
     void startReceivingFile(const QString &path);
     bool fileToReceive() const;
+    void sendFile(const QString &path);
 
 signals:
     void fileIncoming();
+    void newMessage(const QString &peerId, const QString &speaker, const QString &content);
 
 private:
     void cmdHandler();
+    void sendCmd(const std::string &cmd);
     void appendPeerMessage(const std::string &msg);
     void appendFile(const std::string &bytes);
     void setFileLength(size_t length);
-
+    void startSendFile();
 
     std::shared_ptr<sml::service> service_;
 
@@ -57,13 +60,16 @@ private:
         NoneSet = 0x0,
         FileIncoming = 0x1,
         LengthSet = 0x2,
-        PathSet = 0x4
+        PathSet = 0x4,
+        AllSet = FileIncoming | LengthSet | PathSet
     };
     int state_;
     std::string cmd_;
-    size_t file_length_;
-    std::string file_;
-    QString filePath_;
+    size_t recvFileLength_;
+    std::string recvFile_;
+    QString recvFilePath_;
+
+    std::unique_ptr<QFile> sendFile_;
 };
 
 #endif // CHATCONTEXT_H

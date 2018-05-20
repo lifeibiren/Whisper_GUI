@@ -6,6 +6,7 @@
 MainWindow::MainWindow(const std::string &path, QWidget *parent) :
     QMainWindow(parent),
     ui_(new Ui::MainWindow),
+    passwordDialog_(new PasswordDialog(this)),
     fileBrowser_(new FileBrowser(this)),
     peerListModel_(new QStringListModel),
     timer_(new QTimer(this)),
@@ -26,26 +27,17 @@ MainWindow::MainWindow(const std::string &path, QWidget *parent) :
     peerList_ = std::make_unique<PeerList>(service_, this);
     connect(peerList_.get(), &PeerList::add_peer, this, &MainWindow::on_add_peer);
     connect(fileBrowser_.get(), &FileBrowser::accepted, this, &MainWindow::on_fileBrowser_confirmed);
+
+    chatRecord_ = std::make_unique<ChatRecord>(config_["chat_record"].as<QString>(), this);
+//    chatRecord_->update();
+
+    connect(passwordDialog_.get(), &PasswordDialog::passwordEntered, chatRecord_.get(), &ChatRecord::setPassword);
+    passwordDialog_->show();
 //    connect(peerList_.get(), SIGNAL(add_peer(const sml::address &)), this, SLOT(on_add_peer(const sml::address &)));
 //    sml::address addr("127.0.0.1", config_["port"].as<uint16_t>() ^ 1);
 //    service_->post(make_shared<sml::add_peer>(addr));
 //    service_->post(make_shared<sml::add_stream>(addr, 0));l
 //    service_->post(make_shared<sml::send_data>(addr, 0, "Hello World\n"));
-
-//    QStringListModel *model = new QStringListModel();
-//    QStringList list;
-//    list<<"John";
-//    model->setStringList(list);
-//    ui_->peerListView->setModel(model);
-
-//    QStringListModel *model2 = new QStringListModel();
-//    QStringList list2;
-//    list2<<"John: Nice to meet you!";
-//    model2->setStringList(list2);
-//    ui_->peerListView->setModel(model2);
-//    int tail = peerListModel_->rowCount();
-//    peerListModel_->insertRow(tail);
-//    peerListModel_->setData(peerListModel_->index(tail), "123");
 }
 
 MainWindow::~MainWindow()
@@ -82,10 +74,15 @@ void MainWindow::on_timeout()
 
                     // add new chatcontext
                     std::unique_ptr<ChatContext> chatContext = std::make_unique<ChatContext>(service_, new_peer_msg->id(), new_peer_msg->addr());
+                    // connect signal
+                    connect(chatContext.get(), &ChatContext::fileIncoming, this, &MainWindow::refresh);
+                    connect(chatContext.get(), &ChatContext::newMessage, chatRecord_.get(), &ChatRecord::appendMessage);
+
                     ui_->textListView->setModel(chatContext->model());
                     chat_.push_back(std::move(chatContext));
                     // update current_chat_
                     current_chat_ = chat_.rbegin()->get();
+
                 }
                 else
                 {
@@ -106,6 +103,7 @@ void MainWindow::on_timeout()
                     {
                         if (chat_[i]->addr() == recv_data_msg->addr())
                         {
+                            context = chat_[i].get();
                             context->feed(recv_data_msg);
                         }
                     }
@@ -137,11 +135,11 @@ void MainWindow::on_add_peer(const sml::address &addr)
 //    service_->post(boost::make_shared<sml::send_data>(addr, 0, "Hello World\n"));
 }
 
-void MainWindow::on_fileIncoming()
+void MainWindow::refresh()
 {
     if (current_chat_)
     {
-
+        ui_->receiveFileButton->setEnabled(current_chat_->fileToReceive());
     }
 }
 
@@ -156,22 +154,11 @@ void MainWindow::on_fileBrowser_confirmed()
         case FileBrowserState::save:
         {
             current_chat_->startReceivingFile(fileBrowser_->getPath());
-            ui_->receiveFileButton->setDisabled(true);
             break;
         }
         case FileBrowserState::send:
         {
-            QFile file(fileBrowser_->getPath());
-            if (file.open(QIODevice::ReadOnly))
-            {
-                QByteArray bytes = file.readAll();
-                service_->post(boost::make_shared<sml::send_data>(current_chat_->addr(), 0, std::to_string(bytes.size())));
-                service_->post(boost::make_shared<sml::send_data>(current_chat_->addr(), 2, bytes.toStdString()));
-            }
-            else
-            {
-                std::cerr<<"open file failed:"<<fileBrowser_->getPath().toStdString()<<std::endl;
-            }
+            current_chat_->sendFile(fileBrowser_->getPath());
             break;
         }
         default:
@@ -229,6 +216,11 @@ void MainWindow::on_peerListView_clicked(const QModelIndex &index)
     {
         current_chat_ = nullptr;
     }
+
+    if (current_chat_)
+    {
+        refresh();
+    }
 }
 
 void MainWindow::on_sendFileButton_clicked()
@@ -241,4 +233,9 @@ void MainWindow::on_receiveFileButton_clicked()
 {
     state_ = FileBrowserState::save;
     fileBrowser_->show();
+}
+
+void MainWindow::on_chatRecordButton_clicked()
+{
+    chatRecord_->show();
 }

@@ -14,6 +14,8 @@
 #include "service.h"
 #include "chatcontext.h"
 #include "filebrowser.h"
+#include "chatrecord.h"
+#include "passworddialog.h"
 
 namespace Ui {
 class MainWindow;
@@ -36,7 +38,7 @@ private slots:
 
     void on_add_peer(const sml::address &addr);
 
-    void on_fileIncoming();
+    void refresh();
 
     void on_fileBrowser_confirmed();
 
@@ -52,11 +54,15 @@ private slots:
 
     void on_receiveFileButton_clicked();
 
+    void on_chatRecordButton_clicked();
+
 private:
     Ui::MainWindow *ui_;
     std::unique_ptr<SettingDialog> settingDialog_;
+    std::unique_ptr<PasswordDialog> passwordDialog_;
     std::unique_ptr<FileBrowser> fileBrowser_;
     std::unique_ptr<PeerList> peerList_;
+    std::unique_ptr<ChatRecord> chatRecord_;
     std::unique_ptr<QStringListModel> peerListModel_;
     std::unique_ptr<QTimer> timer_;
     const std::string configPath_;

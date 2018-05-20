@@ -122,6 +122,19 @@
      <string>Receive File</string>
     </property>
    </widget>
+   <widget class="QPushButton" name="chatRecordButton">
+    <property name="geometry">
+     <rect>
+      <x>300</x>
+      <y>530</y>
+      <width>88</width>
+      <height>34</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Chat Record</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
    <attribute name="toolBarArea">

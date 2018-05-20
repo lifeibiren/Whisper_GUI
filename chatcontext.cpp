@@ -8,7 +8,7 @@ ChatContext::ChatContext(std::shared_ptr<sml::service> service, const std::strin
       addr_(addr),
       model_(std::make_unique<QStringListModel>()),
       state_(NoneSet),
-      file_length_(0)
+      recvFileLength_(0)
 {
 }
 
@@ -20,12 +20,14 @@ const QString &ChatContext::id() const
 void ChatContext::appendPeerMessage(const std::string &msg)
 {
     appendModelData(model_.get(), id_ + ":" + QString::fromStdString(msg));
+    emit newMessage(id_, id_, QString::fromStdString(msg));
 }
 
 void ChatContext::appendMyMessage(const QString &msg)
 {
     service_->post(boost::make_shared<sml::send_data>(addr_, 1, msg.toStdString()));
     appendModelData(model_.get(), myId_ + ":" + msg);
+    emit newMessage(id_, myId_, msg);
 }
 
 
@@ -76,8 +78,16 @@ void ChatContext::cmdHandler()
             YAML::Node node = YAML::Load(cmd);
             if (node["file"])
             {
-                setFileLength(node["file"].as<size_t>());
-                emit fileIncoming();
+                if (node["file"].as<std::string>() == "OK")
+                {
+                    startSendFile();
+                }
+                else
+                {
+                    state_ |= FileIncoming;
+                    setFileLength(node["file"].as<size_t>());
+                    emit fileIncoming();
+                }
             }
         }
         else
@@ -87,21 +97,43 @@ void ChatContext::cmdHandler()
     }
 }
 
+void ChatContext::sendCmd(const std::string &cmd)
+{
+    service_->post(boost::make_shared<sml::send_data>(addr_, 0, cmd + '\0'));
+}
+
 void ChatContext::startReceivingFile(const QString &path)
 {
     state_ |= PathSet;
-    filePath_ = path;
-    service_->post(boost::make_shared<sml::send_data>(addr_, 0, "OK"));
+    recvFilePath_ = path;
+    YAML::Node node;
+    node["file"] = "OK";
+    sendCmd(YAML::Dump(node));
+}
+
+void ChatContext::sendFile(const QString &path)
+{
+    sendFile_ = std::make_unique<QFile>(path);
+    if (sendFile_->open(QIODevice::ReadOnly))
+    {
+        YAML::Node node;
+        node["file"] = sendFile_->size();
+        sendCmd(YAML::Dump(node));
+    }
+    else
+    {
+        std::cerr<<"open file failed:"<<path.toStdString()<<std::endl;
+    }
 }
 
 void ChatContext::appendFile(const std::string &bytes)
 {
-    file_.append(bytes);
-    if (state_ == (LengthSet | PathSet) &&
-            file_.size() == file_length_)
+    recvFile_.append(bytes);
+    if (state_ == AllSet && recvFile_.size() == recvFileLength_)
     {
-        QFile file(filePath_);
-        file.write(file_.c_str(), file_.size());
+        QFile file(recvFilePath_);
+        file.open(QFile::WriteOnly);
+        file.write(recvFile_.c_str(), recvFile_.size());
         state_ = NoneSet;
     }
 }
@@ -109,8 +141,14 @@ void ChatContext::appendFile(const std::string &bytes)
 void ChatContext::setFileLength(size_t length)
 {
     state_ |= LengthSet;
-    file_length_ = length;
+    recvFileLength_ = length;
     // reserver length bytes room
-    file_.reserve(length);
+    recvFile_.reserve(length);
 }
 
+void ChatContext::startSendFile()
+{
+    QByteArray bytes = sendFile_->readAll();
+    service_->post(boost::make_shared<sml::send_data>(addr_, 2, bytes.toStdString()));
+    sendFile_ = nullptr;
+}

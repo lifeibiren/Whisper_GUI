@@ -31,6 +31,9 @@ SOURCES += \
     trustedpeerstablemodel.cpp \
     chatcontext.cpp \
     filebrowser.cpp \
+    chatrecord.cpp \
+    passworddialog.cpp \
+    encryptor.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -40,12 +43,17 @@ HEADERS += \
     yamlcpp-qt.h \
     chatcontext.h \
     filebrowser.h \
+    chatrecord.h \
+    passworddialog.h \
+    encryptor.h
 
 FORMS += \
         mainwindow.ui \
     settingdialog.ui \
     peerlist.ui \
-    filebrowser.ui
+    filebrowser.ui \
+    chatrecord.ui \
+    passworddialog.ui
 
 #QMAKE_CXXFLAGS_DEBUG += -fsanitize=address,leak,undefined -g3
 #QMAKE_CFLAGS_DEBUG += -fsanitize=address,leak,undefined -g3
