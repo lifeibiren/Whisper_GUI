@@ -1,9 +1,9 @@
-#include "peerlist.h"
-#include "ui_peerlist.h"
+#include "peerlistdialog.h"
+#include "ui_peerlistdialog.h"
 
-PeerList::PeerList(std::shared_ptr<sml::service> service, QWidget *parent) :
+PeerListDialog::PeerListDialog(std::shared_ptr<sml::service> service, QWidget *parent) :
     QDialog(parent),
-    ui_(new Ui::PeerList),
+    ui_(new Ui::PeerListDialog),
     model_(new QStringListModel(this)),
     timer_(new QTimer(this)),
     service_(service)
@@ -14,12 +14,12 @@ PeerList::PeerList(std::shared_ptr<sml::service> service, QWidget *parent) :
     timer_->start(2000);
 }
 
-PeerList::~PeerList()
+PeerListDialog::~PeerListDialog()
 {
     delete ui_;
 }
 
-void PeerList::update_peer_list()
+void PeerListDialog::update_peer_list()
 {
     alive_peer_list_ = service_->peer_list();
 
@@ -36,7 +36,7 @@ void PeerList::update_peer_list()
     model_->setStringList(list);
 }
 
-void PeerList::on_buttonBox_accepted()
+void PeerListDialog::on_buttonBox_accepted()
 {
     // current selected item
     QModelIndex index = ui_->peerListView->currentIndex();

@@ -39,6 +39,8 @@ public:
 
     YAML::Node toYAMLNode() const;
 
+    void appendAnEmptyRow();
+
 private:
     QVector<QString> idVec_;
     QVector<QString> keyVec_;};

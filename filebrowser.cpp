@@ -19,7 +19,7 @@ FileBrowser::~FileBrowser()
 
 const QString &FileBrowser::getPath() const
 {
-    return path_;
+    return ui_->pathLineEdit->text();
 }
 
 void FileBrowser::on_pathListView_clicked(const QModelIndex &index)
@@ -28,7 +28,7 @@ void FileBrowser::on_pathListView_clicked(const QModelIndex &index)
     {
         return;
     }
-    path_ = model_.data(index).toString();
+    ui_->pathLineEdit->setText(dir.absoluteFilePath(model_.data(index).toString()));
 }
 
 void FileBrowser::on_pathListView_activated(const QModelIndex &index)

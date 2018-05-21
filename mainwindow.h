@@ -10,9 +10,10 @@
 #include <yaml-cpp/yaml.h>
 
 #include "settingdialog.h"
-#include "peerlist.h"
+#include "peerlistdialog.h"
 #include "service.h"
-#include "chatcontext.h"
+#include "chatcontextsingle.h"
+#include "chatcontextgroupleader.h"
 #include "filebrowser.h"
 #include "chatrecord.h"
 #include "passworddialog.h"
@@ -33,10 +34,12 @@ public:
 public slots:
     void config_update(YAML::Node &config);
 
+    void on_appendToPeerListView(std::shared_ptr<ChatContext> context);
+
 private slots:
     void on_timeout();
 
-    void on_add_peer(const sml::address &addr);
+    void on_peerList_confirmed(const sml::address &addr);
 
     void refresh();
 
@@ -61,7 +64,7 @@ private:
     std::unique_ptr<SettingDialog> settingDialog_;
     std::unique_ptr<PasswordDialog> passwordDialog_;
     std::unique_ptr<FileBrowser> fileBrowser_;
-    std::unique_ptr<PeerList> peerList_;
+    std::unique_ptr<PeerListDialog> peerListDialog_;
     std::unique_ptr<ChatRecord> chatRecord_;
     std::unique_ptr<QStringListModel> peerListModel_;
     std::unique_ptr<QTimer> timer_;
@@ -71,7 +74,7 @@ private:
     boost::asio::io_service ioContext_;
     std::shared_ptr<sml::service> service_;
     std::unique_ptr<boost::thread> thread_;
-    std::vector<std::unique_ptr<ChatContext>> chat_;
+    std::vector<std::shared_ptr<ChatContext>> chat_;
     ChatContext *current_chat_; //point to current focus
     enum class FileBrowserState : uint8_t {save, send} state_;
 };

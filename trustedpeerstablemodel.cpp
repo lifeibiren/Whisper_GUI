@@ -133,3 +133,8 @@ YAML::Node TrustedPeersTableModel::toYAMLNode() const
     }
     return node;
 }
+
+void TrustedPeersTableModel::appendAnEmptyRow()
+{
+    insertRow(rowCount());
+}

@@ -27,36 +27,47 @@ SOURCES += \
         main.cpp \
         mainwindow.cpp \
     settingdialog.cpp \
-    peerlist.cpp \
     trustedpeerstablemodel.cpp \
     chatcontext.cpp \
     filebrowser.cpp \
     chatrecord.cpp \
     passworddialog.cpp \
-    encryptor.cpp
+    encryptor.cpp \
+    chatcontextsingle.cpp \
+    chatcontextgroup.cpp \
+    peerlistdialog.cpp \
+    chatcontextgroupleader.cpp
 
 HEADERS += \
         mainwindow.h \
     settingdialog.h \
-    peerlist.h \
     trustedpeerstablemodel.h \
     yamlcpp-qt.h \
     chatcontext.h \
     filebrowser.h \
     chatrecord.h \
     passworddialog.h \
-    encryptor.h
+    encryptor.h \
+    chatcontextsingle.h \
+    chatcontextgroup.h \
+    peerlistdialog.h \
+    chatcontextgroupleader.h
 
 FORMS += \
         mainwindow.ui \
     settingdialog.ui \
-    peerlist.ui \
     filebrowser.ui \
     chatrecord.ui \
-    passworddialog.ui
+    passworddialog.ui \
+    peerlistdialog.ui
 
 #QMAKE_CXXFLAGS_DEBUG += -fsanitize=address,leak,undefined -g3
 #QMAKE_CFLAGS_DEBUG += -fsanitize=address,leak,undefined -g3
 #QMAKE_LFLAGS += -fsanitize=address,leak,undefined -g3
+
+QMAKE_CXXFLAGS_DEBUG += -g3
+QMAKE_CFLAGS_DEBUG += -g3
+QMAKE_LFLAGS += -g3
+
 INCLUDEPATH += ../Whisper/client/sml/
 LIBS += -L"../build-Whisper-Desktop_Clang-Debug/client/sml/" -lsml -lboost_system -lboost_thread -lyaml-cpp -lcryptopp -ldl

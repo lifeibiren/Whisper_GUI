@@ -24,6 +24,32 @@ SettingDialog::SettingDialog(YAML::Node &conf, QWidget *parent) :
     //ui_->trustedPeerstableView->setSelectionMode(QAbstractItemView::SingleSelection);
     //ui_->trustedPeerstableView->setCornerButtonEnabled(false);
     //ui_->trustedPeerstableView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+
+    ui_->trustedPeersTableView->setContextMenuPolicy(Qt::ActionsContextMenu);
+    QAction *addAction = new QAction("Add", ui_->trustedPeersTableView);
+    ui_->trustedPeersTableView->addAction(addAction);
+    QAction *delAction = new QAction("delete", ui_->trustedPeersTableView);
+    ui_->trustedPeersTableView->addAction(delAction);
+
+    connect(addAction, &QAction::triggered, trustedPeersTableModel_.get(),
+            [this](bool)
+    {
+        trustedPeersTableModel_->appendAnEmptyRow();
+    });
+
+    connect(delAction, &QAction::triggered, trustedPeersTableModel_.get(),
+            [this](bool)
+    {
+        const QItemSelection selection = ui_->trustedPeersTableView->selectionModel()->selection();
+        for (QItemSelection::const_iterator it = selection.begin(); it != selection.end(); it ++)
+        {
+            QModelIndexList list = it->indexes();
+            for (QModelIndexList::const_iterator it2 = list.begin(); it2 != list.end(); it2 ++)
+            {
+                trustedPeersTableModel_->removeRow(it2->row());
+            }
+        }
+    });
 }
 
 SettingDialog::~SettingDialog()

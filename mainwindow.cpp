@@ -24,24 +24,43 @@ MainWindow::MainWindow(const std::string &path, QWidget *parent) :
     service_ = std::make_shared<sml::service>(ioContext_, sml::configuration(config_));
     thread_ = std::make_unique<boost::thread>(bind(&boost::asio::io_context::run, &ioContext_));
 
-    peerList_ = std::make_unique<PeerList>(service_, this);
-    connect(peerList_.get(), &PeerList::add_peer, this, &MainWindow::on_add_peer);
+    peerListDialog_ = std::make_unique<PeerListDialog>(service_, this);
+    connect(peerListDialog_.get(), &PeerListDialog::add_peer, this, &MainWindow::on_peerList_confirmed);
     connect(fileBrowser_.get(), &FileBrowser::accepted, this, &MainWindow::on_fileBrowser_confirmed);
 
     chatRecord_ = std::make_unique<ChatRecord>(config_["chat_record"].as<QString>(), this);
-//    chatRecord_->update();
-
     connect(passwordDialog_.get(), &PasswordDialog::passwordEntered, chatRecord_.get(), &ChatRecord::setPassword);
+
+    ui_->peerListView->setContextMenuPolicy(Qt::ActionsContextMenu);
+    QAction *groupAction = new QAction(tr("Group"), ui_->peerListView);
+    ui_->peerListView->addAction(groupAction);
+    connect(groupAction, &QAction::triggered, this, [this](bool)
+    {
+        const QItemSelection selection = ui_->peerListView->selectionModel()->selection();
+        std::list<std::shared_ptr<ChatContext>> group;
+        QString name(tr("Group:"));
+        name += QString::fromStdString(service_->conf().id());
+        for (QItemSelection::const_iterator it = selection.begin(); it != selection.end(); it ++)
+        {
+            QModelIndexList list = it->indexes();
+            for (QModelIndexList::const_iterator it2 = list.begin(); it2 != list.end(); it2 ++)
+            {
+                group.push_back(chat_[it2->row()]);
+                name += ',' + chat_[it2->row()]->id();
+            }
+        }
+        on_appendToPeerListView(std::make_shared<ChatContextGroupLeader>(service_, name.toStdString(), group));
+    });
+
     passwordDialog_->show();
-//    connect(peerList_.get(), SIGNAL(add_peer(const sml::address &)), this, SLOT(on_add_peer(const sml::address &)));
-//    sml::address addr("127.0.0.1", config_["port"].as<uint16_t>() ^ 1);
-//    service_->post(make_shared<sml::add_peer>(addr));
-//    service_->post(make_shared<sml::add_stream>(addr, 0));l
-//    service_->post(make_shared<sml::send_data>(addr, 0, "Hello World\n"));
 }
 
 MainWindow::~MainWindow()
 {
+
+    ioContext_.stop();
+    //thread_->interrupt();
+    thread_->join();
     delete ui_;
 }
 
@@ -50,6 +69,31 @@ void MainWindow::config_update(YAML::Node &config)
     config_ = config;
     std::ofstream fout(configPath_);
     fout << config_;
+}
+
+void MainWindow::on_appendToPeerListView(std::shared_ptr<ChatContext> chatContext)
+{
+    // append to peer list
+    int tail = peerListModel_->rowCount();
+    peerListModel_->insertRow(tail);
+    peerListModel_->setData(peerListModel_->index(tail), chatContext->id());
+
+    // select tail
+    ui_->peerListView->selectionModel()->select(peerListModel_->index(tail, 0), QItemSelectionModel::Select);
+
+    // set current model
+    ui_->textListView->setModel(chatContext->model());
+
+    // add new chatcontext
+    chat_.push_back(chatContext);
+
+    // update current_chat_
+    current_chat_ = chat_.rbegin()->get();
+
+    // connect signal
+    connect(chatContext.get(), &ChatContext::fileIncoming, this, &MainWindow::refresh);
+    connect(chatContext.get(), &ChatContext::newMessage, chatRecord_.get(), &ChatRecord::appendMessage);
+    connect(chatContext.get(), &ChatContext::newGroup, this, &MainWindow::on_appendToPeerListView);
 }
 
 void MainWindow::on_timeout()
@@ -64,25 +108,11 @@ void MainWindow::on_timeout()
                 sml::new_peer *new_peer_msg = dynamic_cast<sml::new_peer *>(msg.get());
                 if (new_peer_msg)
                 {
-                    // append to peer list
-                    int tail = peerListModel_->rowCount();
-                    peerListModel_->insertRow(tail);
-                    peerListModel_->setData(peerListModel_->index(tail), QString::fromStdString(new_peer_msg->id()));
                     std::cout<<new_peer_msg->addr().ip()<<":"<<new_peer_msg->addr().port()<<std::endl;
-                    // select tail
-                    ui_->peerListView->selectionModel()->select(peerListModel_->index(tail, 0), QItemSelectionModel::Select);
 
-                    // add new chatcontext
-                    std::unique_ptr<ChatContext> chatContext = std::make_unique<ChatContext>(service_, new_peer_msg->id(), new_peer_msg->addr());
-                    // connect signal
-                    connect(chatContext.get(), &ChatContext::fileIncoming, this, &MainWindow::refresh);
-                    connect(chatContext.get(), &ChatContext::newMessage, chatRecord_.get(), &ChatRecord::appendMessage);
+                    std::shared_ptr<ChatContext> chatContext = std::make_shared<ChatContextSingle>(service_, new_peer_msg->id(), new_peer_msg->addr());
 
-                    ui_->textListView->setModel(chatContext->model());
-                    chat_.push_back(std::move(chatContext));
-                    // update current_chat_
-                    current_chat_ = chat_.rbegin()->get();
-
+                    on_appendToPeerListView(chatContext);
                 }
                 else
                 {
@@ -98,14 +128,9 @@ void MainWindow::on_timeout()
                 sml::recv_data *recv_data_msg = dynamic_cast<sml::recv_data *>(msg.get());
                 if (recv_data_msg)
                 {
-                    ChatContext *context = nullptr;
                     for (int i = 0; i < (int)chat_.size(); i ++)
                     {
-                        if (chat_[i]->addr() == recv_data_msg->addr())
-                        {
-                            context = chat_[i].get();
-                            context->feed(recv_data_msg);
-                        }
+                        chat_[i]->feed(recv_data_msg);
                     }
                 }
                 else
@@ -122,17 +147,10 @@ void MainWindow::on_timeout()
 
 }
 
-void MainWindow::on_add_peer(const sml::address &addr)
+void MainWindow::on_peerList_confirmed(const sml::address &addr)
 {
     std::cout<<addr.ip()<<' '<<(int)addr.port()<<std::endl;
     service_->post(boost::make_shared<sml::add_peer>(addr));
-    // control message
-    service_->post(boost::make_shared<sml::add_stream>(addr, 0));
-    // chat message
-    service_->post(boost::make_shared<sml::add_stream>(addr, 1));
-    // file data
-    service_->post(boost::make_shared<sml::add_stream>(addr, 2));
-//    service_->post(boost::make_shared<sml::send_data>(addr, 0, "Hello World\n"));
 }
 
 void MainWindow::refresh()
@@ -177,7 +195,7 @@ void MainWindow::on_settingsButton_clicked()
 
 void MainWindow::on_addButton_clicked()
 {
-    peerList_->show();
+    peerListDialog_->show();
 }
 
 void MainWindow::on_sendButton_clicked()
@@ -239,3 +257,4 @@ void MainWindow::on_chatRecordButton_clicked()
 {
     chatRecord_->show();
 }
+
