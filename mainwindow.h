@@ -59,6 +59,8 @@ private slots:
 
     void on_chatRecordButton_clicked();
 
+    void on_deleteButton_clicked();
+
 private:
     Ui::MainWindow *ui_;
     std::unique_ptr<SettingDialog> settingDialog_;

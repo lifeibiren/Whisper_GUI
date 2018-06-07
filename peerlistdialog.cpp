@@ -24,25 +24,40 @@ void PeerListDialog::update_peer_list()
     alive_peer_list_ = service_->peer_list();
 
     QStringList list;
-
+    int newIndex = 0;
     if (alive_peer_list_->size())
     {
+        int count = 0;
         for (auto it = alive_peer_list_->begin(); it != alive_peer_list_->end(); it ++)
         {
-            list<<QString::fromStdString(it->ip() + ":" + std::to_string(it->port()));
+            QString str = QString::fromStdString(it->ip() + ":" + std::to_string(it->port()));
+            list << str;
+            if (str == selected)
+            {
+                newIndex = count;
+            }
+            count ++;
         }
+        model_->setStringList(list);
+        ui_->peerListView->selectionModel()->select(model_->index(newIndex), QItemSelectionModel::Select);
     }
-
-    model_->setStringList(list);
 }
 
 void PeerListDialog::on_buttonBox_accepted()
 {
-    // current selected item
-    QModelIndex index = ui_->peerListView->currentIndex();
-    if (index.row() != -1)
+    // find selected peer and emit a signal
+    for (auto it = alive_peer_list_->begin(); it != alive_peer_list_->end(); it ++)
     {
-        emit add_peer((*alive_peer_list_)[index.row()]);
+        QString str = QString::fromStdString(it->ip() + ":" + std::to_string(it->port()));
+        if (str == selected)
+        {
+            emit add_peer(*it);
+        }
     }
 }
 
+
+void PeerListDialog::on_peerListView_clicked(const QModelIndex &index)
+{
+    selected = model_->data(index).toString();
+}

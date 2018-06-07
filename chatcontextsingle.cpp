@@ -16,6 +16,11 @@ ChatContextSingle::ChatContextSingle(std::shared_ptr<sml::service> service, cons
     service_->post(boost::make_shared<sml::add_stream>(addr, 3));
 }
 
+void ChatContextSingle::shutDown()
+{
+    service_->post(boost::make_shared<sml::del_peer>(addr_));
+}
+
 const sml::address &ChatContextSingle::addr() const
 {
     return addr_;

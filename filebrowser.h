@@ -27,7 +27,7 @@ private slots:
 
 private:
     Ui::FileBrowser *ui_;
-    QDir dir;
+    QDir dir_;
     QStringListModel model_;
     QString path_;
 };

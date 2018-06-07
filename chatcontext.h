@@ -29,6 +29,7 @@ public:
     explicit ChatContext(std::shared_ptr<sml::service> service, const std::string &id, QObject *parent = nullptr);
 //    explicit ChatContext(std::shared_ptr<sml::service> service, const std::string &id, const sml::address &addr, QObject *parent = nullptr);
     virtual ~ChatContext() {}
+    virtual void shutDown() {}
 
     const QString &id() const;
     void appendSystemMessage(const QString &msg);

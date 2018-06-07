@@ -34,6 +34,8 @@ private slots:
     void update_peer_list();
     void on_buttonBox_accepted();
 
+    void on_peerListView_clicked(const QModelIndex &index);
+
 private:
     void query_server();
     void receive();
@@ -43,6 +45,7 @@ private:
     std::unique_ptr<QTimer> timer_;
     std::shared_ptr<sml::service> service_;
     boost::shared_ptr<std::vector<sml::address>> alive_peer_list_;
+    QString selected;
 };
 
 #endif // PEERLIST_H

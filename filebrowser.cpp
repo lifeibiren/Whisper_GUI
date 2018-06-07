@@ -4,12 +4,12 @@
 FileBrowser::FileBrowser(QWidget *parent) :
     QDialog(parent),
     ui_(new Ui::FileBrowser),
-    dir(QDir::home())
+    dir_(QDir::home())
 {
     ui_->setupUi(this);
     ui_->pathListView->setModel(&model_);
-    ui_->pathLineEdit->setText(dir.path());
-    model_.setStringList(dir.entryList());
+    ui_->pathLineEdit->setText(dir_.path());
+    model_.setStringList(dir_.entryList());
 }
 
 FileBrowser::~FileBrowser()
@@ -28,7 +28,7 @@ void FileBrowser::on_pathListView_clicked(const QModelIndex &index)
     {
         return;
     }
-    ui_->pathLineEdit->setText(dir.absoluteFilePath(model_.data(index).toString()));
+    ui_->pathLineEdit->setText(dir_.absoluteFilePath(model_.data(index).toString()));
 }
 
 void FileBrowser::on_pathListView_activated(const QModelIndex &index)
@@ -37,17 +37,17 @@ void FileBrowser::on_pathListView_activated(const QModelIndex &index)
     {
         return;
     }
-    if (dir.cd(model_.data(index).toString()))
+    if (dir_.cd(model_.data(index).toString()))
     {
-        ui_->pathLineEdit->setText(dir.path());
-        model_.setStringList(dir.entryList());
+        ui_->pathLineEdit->setText(dir_.path());
+        model_.setStringList(dir_.entryList());
     }
 }
 
 void FileBrowser::on_pathLineEdit_editingFinished()
 {
-    if (dir.cd(ui_->pathLineEdit->text()))
+    if (dir_.cd(ui_->pathLineEdit->text()))
     {
-        model_.setStringList(dir.entryList());
+        model_.setStringList(dir_.entryList());
     }
 }

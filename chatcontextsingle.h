@@ -10,6 +10,7 @@ public:
 
 //    void startReceivingFile(const QString &path);
 //    void sendFile(const QString &path);
+    void shutDown();
 
     const sml::address &addr() const;
     virtual void feed(sml::recv_data *msg);

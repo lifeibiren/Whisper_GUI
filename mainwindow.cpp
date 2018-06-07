@@ -19,7 +19,7 @@ MainWindow::MainWindow(const std::string &path, QWidget *parent) :
     ui_->receiveFileButton->setDisabled(true);
 
     connect(timer_.get(), SIGNAL(timeout()), this, SLOT(on_timeout()));
-    timer_->start(1000);
+    timer_->start(100);
 
     service_ = std::make_shared<sml::service>(ioContext_, sml::configuration(config_));
     thread_ = std::make_unique<boost::thread>(bind(&boost::asio::io_context::run, &ioContext_));
@@ -32,24 +32,36 @@ MainWindow::MainWindow(const std::string &path, QWidget *parent) :
     connect(passwordDialog_.get(), &PasswordDialog::passwordEntered, chatRecord_.get(), &ChatRecord::setPassword);
 
     ui_->peerListView->setContextMenuPolicy(Qt::ActionsContextMenu);
-    QAction *groupAction = new QAction(tr("Group"), ui_->peerListView);
+    QAction *groupAction = new QAction(tr("Create Group"), ui_->peerListView);
     ui_->peerListView->addAction(groupAction);
-    connect(groupAction, &QAction::triggered, this, [this](bool)
+    connect(groupAction, &QAction::triggered, this, [this, groupAction](bool)
     {
-        const QItemSelection selection = ui_->peerListView->selectionModel()->selection();
-        std::list<std::shared_ptr<ChatContext>> group;
-        QString name(tr("Group:"));
-        name += QString::fromStdString(service_->conf().id());
-        for (QItemSelection::const_iterator it = selection.begin(); it != selection.end(); it ++)
+        static bool selected = false;
+        if (selected)
         {
-            QModelIndexList list = it->indexes();
-            for (QModelIndexList::const_iterator it2 = list.begin(); it2 != list.end(); it2 ++)
+            const QItemSelection selection = ui_->peerListView->selectionModel()->selection();
+            std::list<std::shared_ptr<ChatContext>> group;
+            QString name(tr("Group:"));
+            name += QString::fromStdString(service_->conf().id());
+            for (QItemSelection::const_iterator it = selection.begin(); it != selection.end(); it ++)
             {
-                group.push_back(chat_[it2->row()]);
-                name += ',' + chat_[it2->row()]->id();
+                QModelIndexList list = it->indexes();
+                for (QModelIndexList::const_iterator it2 = list.begin(); it2 != list.end(); it2 ++)
+                {
+                    group.push_back(chat_[it2->row()]);
+                    name += ',' + chat_[it2->row()]->id();
+                }
             }
+            on_appendToPeerListView(std::make_shared<ChatContextGroupLeader>(service_, name.toStdString(), group));
+            groupAction->setText(tr("Create Group"));
+            ui_->peerListView->setSelectionMode(QAbstractItemView::SelectionMode::SingleSelection);
         }
-        on_appendToPeerListView(std::make_shared<ChatContextGroupLeader>(service_, name.toStdString(), group));
+        else
+        {
+            groupAction->setText(tr("Confirm"));
+            ui_->peerListView->setSelectionMode(QAbstractItemView::SelectionMode::MultiSelection);
+        }
+        selected = !selected;
     });
 
     passwordDialog_->show();
@@ -108,11 +120,23 @@ void MainWindow::on_timeout()
                 sml::new_peer *new_peer_msg = dynamic_cast<sml::new_peer *>(msg.get());
                 if (new_peer_msg)
                 {
-                    std::cout<<new_peer_msg->addr().ip()<<":"<<new_peer_msg->addr().port()<<std::endl;
+                    bool find = false;
+                    for (int i = 0; i < (int)chat_.size(); i ++)
+                    {
+                        if (chat_[i]->id().toStdString() == new_peer_msg->id())
+                        {
+                            find = true;
+                            break;
+                        }
+                    }
+                    if (!find)
+                    {
+                        std::cout<<new_peer_msg->addr().ip()<<":"<<new_peer_msg->addr().port()<<std::endl;
 
-                    std::shared_ptr<ChatContext> chatContext = std::make_shared<ChatContextSingle>(service_, new_peer_msg->id(), new_peer_msg->addr());
+                        std::shared_ptr<ChatContext> chatContext = std::make_shared<ChatContextSingle>(service_, new_peer_msg->id(), new_peer_msg->addr());
 
-                    on_appendToPeerListView(chatContext);
+                        on_appendToPeerListView(chatContext);
+                    }
                 }
                 else
                 {
@@ -182,8 +206,6 @@ void MainWindow::on_fileBrowser_confirmed()
         default:
             break;
     }
-
-
 }
 
 void MainWindow::on_settingsButton_clicked()
@@ -258,3 +280,27 @@ void MainWindow::on_chatRecordButton_clicked()
     chatRecord_->show();
 }
 
+
+void MainWindow::on_deleteButton_clicked()
+{
+    if (current_chat_)
+    {
+        current_chat_->shutDown();
+        for (int i = 0; i < peerListModel_->rowCount(); i ++)
+        {
+            if (peerListModel_->data(peerListModel_->index(i)).toString() == current_chat_->id())
+            {
+                peerListModel_->removeRow(i);
+            }
+        }
+        for (auto it = chat_.begin(); it != chat_.end(); it ++)
+        {
+            if (it->get() == current_chat_)
+            {
+                it = chat_.erase(it);
+                break;
+            }
+        }
+        current_chat_ = nullptr;
+    }
+}
